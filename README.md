@@ -1,6 +1,6 @@
 # example of python codes
 
-## ex_slice.py
+## slice
 ```
 $ ./ex_slice.py
 data = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -18,6 +18,9 @@ Ran 1 test in 0.000s
 
 OK
 ```
+
+## argparse
+* [Pythonのargparseでブール値を扱うときは注意が必要 \| note\.nkmk\.me]( https://note.nkmk.me/python-argparse-bool/ )
 
 ----
 
