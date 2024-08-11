@@ -5,7 +5,7 @@ from typing import Union
 import jwt
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jwt.exceptions import InvalidTokenError
+from jwt.exceptions import InvalidTokenError, ExpiredSignatureError
 from passlib.context import CryptContext
 from pydantic import BaseModel
 
@@ -13,6 +13,7 @@ from pydantic import BaseModel
 # openssl rand -hex 32
 SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
 ALGORITHM = "HS256"
+# ⭐トークンの有効期限
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 
@@ -96,12 +97,19 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
+        # NOTE: expはここで判定される
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        print(f'⭐ receive request {payload=}')
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
         token_data = TokenData(username=username)
-    except InvalidTokenError:
+    # NOTE: InvalidTokenErrorよりもExpiredSignatureErrorの方が詳細のエラー
+    except ExpiredSignatureError as e:
+        print(f'🔥[ExpiredSignatureError] {e}')
+        raise credentials_exception
+    except InvalidTokenError as e:
+        print(f'🔥[InvalidTokenError] {e}')
         raise credentials_exception
     user = get_user(fake_users_db, username=token_data.username)
     if user is None:
@@ -131,8 +139,9 @@ async def login_for_access_token(
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": user.username, "user_defined_value": "hello world" * 1000}, expires_delta=access_token_expires
     )
+    print(f'⭐ return response {access_token=}')
     return Token(access_token=access_token, token_type="bearer")
 
 
@@ -144,3 +153,7 @@ async def read_users_me(current_user: User = Depends(get_current_active_user)):
 @app.get("/users/me/items/")
 async def read_own_items(current_user: User = Depends(get_current_active_user)):
     return [{"item_id": "Foo", "owner": current_user.username}]
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
